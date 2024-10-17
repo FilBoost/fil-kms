@@ -22,8 +22,8 @@ import (
 )
 
 type onWalletSign struct {
-	Addr address.Address `json:"addr" form:"addr" binding:"required"`
-	Msg  []byte          `json:"msg" form:"msg" binding:"required"`
+	Addr address.Address `json:"addr" form:"addr" binding:"required"` //申请签名的地址，一般表示为DC的client地址
+	Msg  []byte          `json:"msg" form:"msg" binding:"required"`   //cbor格式的market.DealProposal
 }
 
 func NewOnWalletSign() http.Handler {
@@ -33,12 +33,14 @@ func NewOnWalletSign() http.Handler {
 func (ws *onWalletSign) CheckParams(gCtx *gin.Context) {
 	remoteAddr := gCtx.Request.RemoteAddr
 
+	//解析body信息，json格式
 	if err := gCtx.BindJSON(ws); err != nil {
 		log.Warnf("remote: %v,err: %v", remoteAddr, err)
 		utils.Error(gCtx, http_response.ValidatorParamsCheckFail, err)
 		return
 	}
 
+	//权限验证
 	authorization := gCtx.Request.Header.Get("Authorization")
 	ok, sign := VerificationToken(authorization)
 	if !ok {
@@ -68,6 +70,7 @@ func (ws *onWalletSign) CheckParams(gCtx *gin.Context) {
 		return
 	}
 
+	//可以写一个额外的检查或限制在这里
 	err = ws.check(gCtx)
 	if err != nil {
 		log.Warnf("The request is illegal. err:%v", err)
@@ -98,11 +101,13 @@ func (ws *onWalletSign) check(gCtx *gin.Context) error {
 }
 
 func (ws *onWalletSign) Handler(gCtx *gin.Context) {
+	//签名
 	signature, err := sign_service.GlobalWalletService.WalletSign(context.TODO(), ws.Addr, ws.Msg, api.MsgMeta{})
 	if err != nil {
 		utils.Error(gCtx, http_response.FAIL, err)
 		return
 	}
+
 	utils.Success(gCtx, *signature)
 }
 
